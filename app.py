@@ -128,6 +128,5 @@ if __name__ == '__main__':
     t = threading.Thread(target=run_flask)
     t.start()
     
-    # Start Discord Bot (PASTE TOKEN BELOW)
     # This tells the bot to get the password from Render's secret vault
-bot.run(os.environ.get("DISCORD_TOKEN"))
+    bot.run(os.environ.get("DISCORD_TOKEN"))
