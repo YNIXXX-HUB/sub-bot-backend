@@ -189,6 +189,22 @@ def run_flask():
     app.run(host='0.0.0.0', port=10000)
 
 if __name__ == '__main__':
+    # Start Flask in a background thread
     t = threading.Thread(target=run_flask)
     t.start()
-    bot.run(os.environ.get("DISCORD_TOKEN"))
+    
+    # Add a small delay to let Flask start first
+    import time
+    time.sleep(3)
+    
+    # Retry logic for Discord
+    try:
+        bot.run(os.environ.get("DISCORD_TOKEN"))
+    except discord.errors.HTTPException as e:
+        if e.status == 429:
+            print("RATE LIMITED! Render IP is banned. deploy 'Clear Cache' to fix.")
+            # Keep the web server alive so Render doesn't crash
+            while True:
+                time.sleep(3600)
+        else:
+            raise e
