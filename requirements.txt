@@ -4,4 +4,3 @@ pymongo
 dnspython
 gunicorn
 discord
-threading
