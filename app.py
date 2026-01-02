@@ -1,98 +1,133 @@
+import discord
+from discord.ext import commands
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pymongo
-from datetime import datetime, timedelta
+import threading
 import os
+import asyncio
 
-app = Flask(__name__)
-CORS(app) # Allows your website to talk to this backend
-
-# CONNECT TO DATABASE
-# We will set the URL in Render settings later
+# --- CONFIGURATION ---
 MONGO_URL = os.environ.get("MONGO_URL")
+# PASTE YOUR DISCORD TOKEN AT THE BOTTOM OF THE FILE!
+
+# --- DATABASE SETUP ---
 client = pymongo.MongoClient(MONGO_URL)
 db = client.get_database("sub_bot_db")
 users_col = db.users
 links_col = db.links
 
+# --- DISCORD BOT SETUP ---
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="/", intents=intents)
+
+# --- FLASK API SETUP (For the Script) ---
+app = Flask(__name__)
+CORS(app)
+
 @app.route('/')
 def home():
-    return "Backend is Active!"
-
-@app.route('/login', methods=['POST'])
-def login():
-    data = request.json
-    username = data.get('username')
-    user = users_col.find_one({"username": username})
-    if not user:
-        # Create new user
-        users_col.insert_one({
-            "username": username,
-            "points": 50, # Starter points
-            "timeout_until": datetime.now()
-        })
-    return jsonify({"status": "success"})
-
-@app.route('/get_user', methods=['POST'])
-def get_user():
-    data = request.json
-    user = users_col.find_one({"username": data['username']})
-    # Check if timed out
-    is_timed_out = False
-    if user.get('timeout_until') > datetime.now():
-        is_timed_out = True
-    
-    return jsonify({
-        "points": user['points'],
-        "is_timed_out": is_timed_out
-    })
-
-@app.route('/add_link', methods=['POST'])
-def add_link():
-    data = request.json
-    username = data['username']
-    url = data['url']
-    
-    user = users_col.find_one({"username": username})
-    if user['points'] < 50:
-        return jsonify({"error": "Not enough points! Need 50."})
-    
-    # Deduct points and add link
-    users_col.update_one({"username": username}, {"$inc": {"points": -50}})
-    links_col.insert_one({"url": url, "owner": username})
-    return jsonify({"status": "success"})
-
-@app.route('/get_links', methods=['GET'])
-def get_links():
-    # Get 10 random links
-    links = list(links_col.aggregate([{"$sample": {"size": 10}}]))
-    for link in links:
-        link['_id'] = str(link['_id']) # Fix for JSON
-    return jsonify(links)
+    return "Bot is Alive"
 
 @app.route('/verify_action', methods=['POST'])
 def verify():
     data = request.json
-    username = data['username']
-    action_type = data['type'] # 'SUB' or 'UNSUB'
+    discord_id = data.get('discord_id') # The script sends the User ID
+    action = data.get('type')
 
-    user = users_col.find_one({"username": username})
+    if not discord_id:
+        return jsonify({"error": "No ID"})
 
-    # CHECK TIMEOUT
-    if user.get('timeout_until') > datetime.now():
-        return jsonify({"error": "You are timed out!"})
+    user = users_col.find_one({"discord_id": discord_id})
+    if not user:
+        return jsonify({"error": "User not found in Discord"})
 
-    if action_type == "SUB":
-        users_col.update_one({"username": username}, {"$inc": {"points": 10}})
-        return jsonify({"msg": "Points Added!"})
+    if action == "SUB":
+        users_col.update_one({"discord_id": discord_id}, {"$inc": {"points": 10}})
+        return jsonify({"msg": "Points Added"})
     
-    elif action_type == "UNSUB":
-        # 20 Minute Timeout
-        timeout_time = datetime.now() + timedelta(minutes=20)
-        users_col.update_one({"username": username}, {"$set": {"timeout_until": timeout_time}})
-        return jsonify({"msg": "TIMEOUT APPLIED"})
+    if action == "UNSUB":
+        # Deduct points or timeout logic here
+        return jsonify({"msg": "Punishment logged"})
 
-    return jsonify({"msg": "Action received"})
+    return jsonify({"msg": "Received"})
+
+# --- DISCORD COMMANDS ---
+
+@bot.event
+async def on_ready():
+    print(f'Logged in as {bot.user}')
+
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+
+    # XP SYSTEM (Chatting gives 1 point)
+    user_id = str(message.author.id)
+    user = users_col.find_one({"discord_id": user_id})
+    
+    if not user:
+        users_col.insert_one({"discord_id": user_id, "points": 0, "xp": 0})
+    else:
+        users_col.update_one({"discord_id": user_id}, {"$inc": {"xp": 1}})
+
+    await bot.process_commands(message)
+
+@bot.command()
+async def points(ctx):
+    user_id = str(ctx.author.id)
+    user = users_col.find_one({"discord_id": user_id})
+    if not user:
+        await ctx.send("You have 0 points.")
+    else:
+        await ctx.send(f"💳 You have **{user['points']}** points.")
+
+@bot.command()
+async def promote(ctx, url: str):
+    user_id = str(ctx.author.id)
+    user = users_col.find_one({"discord_id": user_id})
+    
+    if not user or user['points'] < 50:
+        await ctx.send("❌ You need **50 Points** to promote! Install the script and sub to others first.")
+        return
+
+    # Deduct points
+    users_col.update_one({"discord_id": user_id}, {"$inc": {"points": -50}})
+    
+    # Save link
+    links_col.insert_one({"url": url, "owner": user_id})
+    
+    # Send Embed
+    embed = discord.Embed(title="🌟 New Channel Promotion!", description=f"Check out this channel:\n{url}", color=0x00ff00)
+    embed.set_footer(text="Click the link, sub, and earn points!")
+    
+    # Send to a specific channel (Optional: Replace CHANNEL_ID)
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def earn(ctx):
+    # Get a random link
+    pipeline = [{"$sample": {"size": 1}}]
+    links = list(links_col.aggregate(pipeline))
+    
+    if len(links) == 0:
+        await ctx.send("No links to promote yet!")
+        return
+
+    url = links[0]['url']
+    await ctx.send(f"Go sub to this channel to earn 10 points:\n{url}\n\n*Make sure you have the Script installed!*")
+
+# --- RUNNING BOTH AT ONCE ---
+def run_flask():
+    app.run(host='0.0.0.0', port=10000)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+    # Start Flask in a background thread
+    t = threading.Thread(target=run_flask)
+    t.start()
+    
+    # Start Discord Bot (PASTE TOKEN BELOW)
+    # This tells the bot to get the password from Render's secret vault
+bot.run(os.environ.get("DISCORD_TOKEN"))
