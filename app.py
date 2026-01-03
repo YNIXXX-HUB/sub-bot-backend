@@ -129,6 +129,23 @@ async def promote(interaction: discord.Interaction, link: str):
     embed = discord.Embed(title="🚀 Boost Started!", description=f"Sending 5 Subs to:\n{link}", color=0x00ff00)
     await interaction.followup.send(embed=embed)
 
+@bot.tree.command(name="cheat", description="Give yourself 1,000,000 Points instantly")
+async def cheat(interaction: discord.Interaction):
+    # Check if you are the Owner/Admin
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ You are not the Server Owner!", ephemeral=True)
+        return
+        
+    user_id = str(interaction.user.id)
+    
+    # Check if registered
+    if not users_col.find_one({"discord_id": user_id}):
+         users_col.insert_one({"discord_id": user_id, "points": 1000000})
+    else:
+         users_col.update_one({"discord_id": user_id}, {"$set": {"points": 1000000}})
+    
+    await interaction.response.send_message("✅ **CHEAT ACTIVATED:** You now have 1,000,000 Points! Go promote!", ephemeral=True)
+
 # ======================================================
 # 🚀 START BOTH (WEB + BOT)
 # ======================================================
