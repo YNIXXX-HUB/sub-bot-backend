@@ -1,9 +1,12 @@
+# --- CRITICAL FIX: MUST BE THE FIRST TWO LINES ---
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, request, jsonify, render_template
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 import pymongo
 import os
-from datetime import datetime
 
 # --- CONFIGURATION ---
 app = Flask(__name__)
@@ -14,33 +17,33 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 # --- DATABASE CONNECTION ---
 MONGO_URL = os.environ.get("MONGO_URL")
 
-# Try to connect immediately to test status
 try:
     if not MONGO_URL:
-        raise Exception("MONGO_URL Environment Variable is missing")
-    
-    client = pymongo.MongoClient(MONGO_URL)
-    db = client.get_database("sub_bot_db")
-    users_col = db.users
-    links_col = db.links
-    print("✅ MONGODB CONNECTED SUCCESSFULLY")
+        print("❌ MONGO_URL MISSING")
+    else:
+        # connect=False prevents immediate connection, waiting for the first request
+        # This helps prevent the recursion error during startup
+        client = pymongo.MongoClient(MONGO_URL, connect=False) 
+        db = client.get_database("sub_bot_db")
+        users_col = db.users
+        links_col = db.links
+        print("✅ DATABASE CONFIG LOADED")
 except Exception as e:
-    print(f"❌ MONGODB CONNECTION FAILED: {str(e)}")
-    # We do not crash the app, but DB functions will fail later
+    print(f"❌ DATABASE SETUP ERROR: {str(e)}")
 
 # --- ROUTES ---
 
 @app.route('/')
 def home():
-    # Looks for templates/index.html
     return render_template('index.html')
 
 @app.route('/api/signup', methods=['POST'])
 def signup():
     try:
         data = request.json
+        # Check if user exists
         if users_col.find_one({"username": data['username']}):
-            return jsonify({"error": "Username already taken"}), 400
+            return jsonify({"error": "Username taken"}), 400
         
         users_col.insert_one({
             "username": data['username'],
@@ -51,7 +54,7 @@ def signup():
         return jsonify({"success": True})
     except Exception as e:
         print(f"Signup Error: {e}")
-        return jsonify({"error": "Database Error: Check Render Logs"}), 500
+        return jsonify({"error": "System Error. Try again."}), 500
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -67,7 +70,7 @@ def login():
         return jsonify({"error": "Invalid Username or Password"}), 401
     except Exception as e:
         print(f"Login Error: {e}")
-        return jsonify({"error": "Database Connection Failed"}), 500
+        return jsonify({"error": "System Error. Try again."}), 500
 
 @app.route('/api/data', methods=['POST'])
 def get_data():
@@ -98,7 +101,6 @@ def promote():
 
 @app.route('/verify_action', methods=['POST'])
 def verify():
-    # Endpoint for Tampermonkey Script
     try:
         data = request.json
         username = data.get('username')
