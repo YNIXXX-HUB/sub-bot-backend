@@ -6,7 +6,6 @@ import os
 import threading
 import time
 import random
-import sys
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from flask import Flask
@@ -35,7 +34,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ======================================================
-# 🤖 YOUTUBE LOGIC (Clean & Robust)
+# 🤖 YOUTUBE LOGIC (ACTIVITY SIMULATION)
 # ======================================================
 def run_boost(channel_id):
     print(f"\n[DEBUG] 🚀 STARTING JOB FOR: {channel_id}", flush=True)
@@ -44,7 +43,6 @@ def run_boost(channel_id):
         print("[CRITICAL ERROR] ❌ GOOGLE_ID or GOOGLE_SECRET is missing!", flush=True)
         return
 
-    # Shuffle to keep it random
     indices = list(range(len(BOT_ACCOUNTS)))
     random.shuffle(indices)
 
@@ -54,13 +52,7 @@ def run_boost(channel_id):
         print(f"[DEBUG] 🔄 Preparing Account {i+1}...", flush=True)
         
         try:
-            # 1. RANDOM SLEEP (The protection)
-            # This separates the subs so they don't look like a bot swarm
-            wait_time = random.randint(30, 60)
-            print(f"⏳ Waiting {wait_time}s to avoid detection...", flush=True)
-            time.sleep(wait_time)
-
-            # 2. LOGIN
+            # LOGIN
             creds = Credentials(
                 None,
                 refresh_token=token,
@@ -68,22 +60,40 @@ def run_boost(channel_id):
                 client_id=GOOGLE_CLIENT_ID,
                 client_secret=GOOGLE_CLIENT_SECRET
             )
-            
-            # 3. BUILD SERVICE (Standard Method - No spoofing hacks that break)
             youtube = build('youtube', 'v3', credentials=creds)
 
-            # 4. SUBSCRIBE
+            # STEP 1: SIMULATE "VIEWING" THE CHANNEL
+            # We ask for the channel details first. This looks like a human loading the page.
+            youtube.channels().list(
+                part="snippet,statistics",
+                id=channel_id
+            ).execute()
+            print(f"👀 Account {i+1} is viewing channel info...", flush=True)
+            
+            # STEP 2: "READING" DELAY
+            # Humans take 5-10 seconds to find the subscribe button
+            time.sleep(random.randint(5, 10))
+
+            # STEP 3: SUBSCRIBE
             youtube.subscriptions().insert(
                 part="snippet",
                 body={"snippet": {"resourceId": {"kind": "youtube#channel", "channelId": channel_id}}}
             ).execute()
             
             print(f"[SUCCESS] ✅ Account {i+1} Subscribed!", flush=True)
+
+            # STEP 4: LONG COOL DOWN
+            # Wait 60-120 seconds before swapping accounts to clear IP heat
+            wait = random.randint(60, 120)
+            print(f"⏳ Cooling down for {wait}s...", flush=True)
+            time.sleep(wait)
             
         except Exception as e:
             error_str = str(e)
             if "subscriptionDuplicate" in error_str:
                 print(f"[INFO] ⚠️ Account {i+1} was ALREADY subscribed.", flush=True)
+                # Still wait even if duplicate, to keep pattern natural
+                time.sleep(30)
             elif "invalid_grant" in error_str:
                 print(f"[FATAL] ❌ TOKEN EXPIRED. Generate new keys on PC.", flush=True)
             else:
@@ -136,7 +146,7 @@ async def promote(interaction: discord.Interaction, link: str):
     threading.Thread(target=run_boost, args=(channel_id,)).start()
     
     embed = discord.Embed(title="🚀 Boost Queued!", description=f"Sending 5 Subscribers to:\n{link}", color=0x00ff00)
-    embed.set_footer(text="CHECK RENDER LOGS FOR LIVE STATUS")
+    embed.set_footer(text="⚠️ SLOW MODE: This will take 10 minutes to ensure subs count.")
     await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="register", description="Create account")
