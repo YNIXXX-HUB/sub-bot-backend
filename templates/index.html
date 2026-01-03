@@ -3,168 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus Growth | Premium</title>
+    <title>Nexus Growth</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg: #09090b;
-            --panel: #18181b;
-            --border: #27272a;
-            --accent: #6366f1; /* Indigo-500 */
-            --accent-hover: #4f46e5;
-            --text-main: #ffffff;
-            --text-dim: #a1a1aa;
-            --danger: #ef4444;
-            --success: #22c55e;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-        body { background-color: var(--bg); color: var(--text-main); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        
-        /* AUTH SCREEN */
-        #auth-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 50; display: flex; align-items: center; justify-content: center; }
-        .glass-panel { background: var(--panel); border: 1px solid var(--border); padding: 40px; border-radius: 16px; width: 400px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
-        .brand-title { font-size: 2rem; font-weight: 800; color: var(--accent); margin-bottom: 5px; letter-spacing: -1px; }
-        .subtitle { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 25px; }
-        
-        .input-group { margin-bottom: 15px; text-align: left; }
-        .input-group label { display: block; color: var(--text-dim); font-size: 0.8rem; margin-bottom: 5px; }
-        input { width: 100%; background: #27272a; border: 1px solid #3f3f46; color: white; padding: 12px; border-radius: 8px; outline: none; transition: 0.2s; }
-        input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); }
-        
-        .btn-primary { width: 100%; background: var(--accent); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
-        .btn-link { background: none; border: none; color: var(--text-dim); margin-top: 15px; cursor: pointer; font-size: 0.9rem; }
-        .btn-link:hover { color: white; text-decoration: underline; }
-        
-        .error-banner { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger); padding: 10px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 15px; display: none; }
-
-        /* MAIN APP LAYOUT */
-        #app-layout { display: none; height: 100vh; display: flex; }
-        
-        /* SIDEBAR */
-        aside { width: 260px; background: var(--panel); border-right: 1px solid var(--border); padding: 25px; display: flex; flex-direction: column; }
-        .user-profile { background: #27272a; padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 30px; }
-        .user-name { font-weight: 700; font-size: 1.1rem; }
-        .user-stats { display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.9rem; color: var(--text-dim); }
-        .stat-value { color: var(--accent); font-weight: bold; }
-        
-        .menu-item { display: block; padding: 12px; border-radius: 8px; color: var(--text-dim); text-decoration: none; margin-bottom: 5px; cursor: pointer; transition: 0.2s; }
-        .menu-item:hover { background: #27272a; color: white; }
-        .menu-item.active { background: rgba(99, 102, 241, 0.1); color: var(--accent); }
-
-        /* CENTER FEED */
-        main { flex: 1; padding: 30px; overflow-y: auto; }
-        .feed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-        
-        .promo-creator { background: var(--panel); border: 1px solid var(--border); padding: 20px; border-radius: 12px; margin-bottom: 30px; }
-        .promo-row { display: flex; gap: 10px; margin-top: 15px; }
-        
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-        .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; transition: 0.2s; position: relative; overflow: hidden; }
-        .card:hover { border-color: var(--accent); transform: translateY(-3px); }
-        .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: var(--accent); opacity: 0.5; }
-        .card h3 { font-size: 1.1rem; margin-bottom: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        
-        /* CHAT */
-        .chat-section { width: 320px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
-        .chat-head { padding: 20px; border-bottom: 1px solid var(--border); font-weight: 700; display: flex; align-items: center; gap: 10px; }
-        .live-dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; box-shadow: 0 0 10px var(--success); }
-        .chat-body { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-        .chat-msg { font-size: 0.9rem; line-height: 1.4; }
-        .chat-user { color: var(--accent); font-weight: 700; margin-right: 5px; }
-        .chat-foot { padding: 20px; border-top: 1px solid var(--border); }
-
+        :root { --bg: #09090b; --panel: #18181b; --border: #27272a; --accent: #6366f1; --text: #fff; }
+        body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; height: 100vh; margin: 0; display: flex; flex-direction: column; }
         .hidden { display: none !important; }
+        
+        /* MODAL & AUTH */
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 50; display: flex; align-items: center; justify-content: center; }
+        .box { background: var(--panel); padding: 30px; border: 1px solid var(--border); border-radius: 12px; width: 400px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 10px 0; background: #27272a; border: 1px solid #3f3f46; color: white; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 5px; }
+        textarea { width: 100%; height: 150px; background: #000; color: #0f0; padding: 10px; font-family: monospace; font-size: 0.8rem; margin-top: 10px; border: 1px solid #333; }
+        
+        /* APP LAYOUT */
+        #app { display: none; height: 100vh; display: flex; }
+        aside { width: 250px; padding: 20px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        main { flex: 1; padding: 20px; overflow-y: auto; }
+        .chat-section { width: 300px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
+        
+        .card { background: var(--panel); padding: 15px; border: 1px solid var(--border); margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .chat-msgs { flex: 1; overflow-y: auto; padding: 15px; }
+        .chat-input { padding: 15px; border-top: 1px solid var(--border); }
+        .menu-btn { padding: 10px; cursor: pointer; color: #a1a1aa; margin-bottom: 5px; }
+        .menu-btn:hover { color: white; background: #27272a; border-radius: 6px; }
     </style>
 </head>
 <body>
 
     <!-- AUTH SCREEN -->
-    <div id="auth-overlay">
-        <div class="glass-panel">
-            <div class="brand-title">Nexus 🚀</div>
-            <div class="subtitle">The #1 Growth Exchange Platform</div>
-            <div id="error-banner" class="error-banner"></div>
-
-            <!-- LOGIN -->
-            <div id="login-view">
-                <div class="input-group">
-                    <label>Username</label>
-                    <input type="text" id="l-user">
-                </div>
-                <div class="input-group">
-                    <label>Password</label>
-                    <input type="password" id="l-pass">
-                </div>
-                <button class="btn-primary" onclick="handleLogin()">Log In</button>
-                <button class="btn-link" onclick="switchView('signup')">Create an Account</button>
+    <div id="auth-overlay" class="overlay">
+        <div class="box">
+            <h1 style="color:var(--accent)">Nexus 🚀</h1>
+            <p id="error-msg" style="color:#ef4444; font-size:0.9rem;"></p>
+            
+            <div id="l-form">
+                <input id="l-user" placeholder="Username">
+                <input id="l-pass" type="password" placeholder="Password">
+                <button onclick="login()">Log In</button>
+                <p style="margin-top:10px; font-size:0.9rem; cursor:pointer;" onclick="toggleAuth()">Create Account</p>
             </div>
-
-            <!-- SIGNUP -->
-            <div id="signup-view" class="hidden">
-                <div class="input-group">
-                    <label>Choose Username</label>
-                    <input type="text" id="s-user">
-                </div>
-                <div class="input-group">
-                    <label>Choose Password</label>
-                    <input type="password" id="s-pass">
-                </div>
-                <button class="btn-primary" onclick="handleSignup()">Sign Up</button>
-                <button class="btn-link" onclick="switchView('login')">Back to Login</button>
+            
+            <div id="s-form" class="hidden">
+                <input id="s-user" placeholder="New Username">
+                <input id="s-pass" type="password" placeholder="New Password">
+                <button onclick="signup()">Sign Up</button>
+                <p style="margin-top:10px; font-size:0.9rem; cursor:pointer;" onclick="toggleAuth()">Back to Login</p>
             </div>
         </div>
     </div>
 
-    <!-- APP INTERFACE -->
-    <div id="app-layout">
-        <aside>
-            <div class="brand-title" style="font-size: 1.5rem; margin-bottom: 30px;">Nexus</div>
-            
-            <div class="user-profile">
-                <div class="user-name" id="display-name">Guest</div>
-                <div class="user-stats">
-                    <span>Points</span>
-                    <span class="stat-value" id="display-points">0</span>
-                </div>
-            </div>
+    <!-- SCRIPT DOWNLOAD POPUP -->
+    <div id="script-modal" class="overlay hidden">
+        <div class="box" style="width: 500px; text-align: left;">
+            <h3>📜 Install the Script</h3>
+            <p style="font-size:0.9rem; color:#aaa;">1. Install <b>Tampermonkey</b> extension.<br>2. Create New Script.<br>3. Paste this code & Save.</p>
+            <textarea id="script-code" readonly></textarea>
+            <button onclick="copyScript()">Copy Code</button>
+            <button onclick="document.getElementById('script-modal').classList.add('hidden')" style="background:#333;">Close</button>
+        </div>
+    </div>
 
-            <div class="menu-item active">🔥 Dashboard</div>
-            <div class="menu-item" onclick="alert('Install Script to Earn!')">📜 Get Script</div>
+    <!-- MAIN APP -->
+    <div id="app">
+        <aside>
+            <h2 style="color:var(--accent)">Nexus</h2>
+            <div style="background:#27272a; padding:15px; border-radius:8px; margin: 20px 0;">
+                <h3 id="d-user">User</h3>
+                <p>Points: <span id="d-pts" style="color:var(--accent)">0</span></p>
+            </div>
+            
+            <div class="menu-btn" onclick="showScriptModal()">📜 Get Script</div>
             <div style="flex:1"></div>
-            <div class="menu-item" style="color:var(--danger)" onclick="location.reload()">Log Out</div>
+            <div class="menu-btn" style="color:#ef4444" onclick="logout()">Log Out</div>
         </aside>
 
         <main>
-            <div class="promo-creator">
-                <h3>🚀 Promote Your Channel</h3>
-                <p style="color:var(--text-dim); font-size:0.9rem;">Cost: 50 Points per promotion</p>
-                <div class="promo-row">
-                    <input type="text" id="promo-url" placeholder="https://youtube.com/channel/..." style="flex:1">
-                    <button class="btn-primary" style="width: auto;" onclick="promote()">Promote</button>
+            <div style="background:#27272a; padding:20px; border-radius:8px; margin-bottom:20px;">
+                <h3>Promote Channel (-50 pts)</h3>
+                <div style="display:flex; gap:10px;">
+                    <input id="promo-url" placeholder="https://youtube.com/..." style="margin:0;">
+                    <button onclick="promote()" style="width:auto; margin:0;">Promote</button>
                 </div>
             </div>
-
-            <div class="feed-header">
-                <h3>Active Promotions</h3>
-                <button class="btn-link" style="margin:0; color:var(--accent)" onclick="loadData()">Refresh Feed</button>
-            </div>
-
-            <div class="card-grid" id="feed-container">
-                <!-- Cards inject here -->
-            </div>
+            <h3>Active Promotions</h3>
+            <div id="feed">Loading...</div>
         </main>
 
         <div class="chat-section">
-            <div class="chat-head">
-                <div class="live-dot"></div> Live Global Chat
-            </div>
-            <div class="chat-body" id="chat-box">
-                <!-- Messages -->
-            </div>
-            <div class="chat-foot">
-                <input type="text" id="chat-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendChat()">
+            <div style="padding:15px; border-bottom:1px solid var(--border); font-weight:bold;">Live Chat</div>
+            <div class="chat-msgs" id="chat-box"></div>
+            <div class="chat-input">
+                <input id="chat-msg" placeholder="Type..." onkeypress="if(event.key==='Enter') sendChat()">
             </div>
         </div>
     </div>
@@ -172,101 +104,105 @@
     <script>
         const socket = io();
         let currentUser = null;
+        const RENDER_URL = window.location.origin; // Automatically gets your website URL
 
-        function showError(msg) {
-            const el = document.getElementById('error-banner');
-            el.innerText = msg;
-            el.style.display = 'block';
+        // --- AUTO LOGIN LOGIC ---
+        window.onload = function() {
+            const savedUser = localStorage.getItem('nexus_user');
+            if(savedUser) {
+                // Auto-login (we trust local storage for UI, real validation happens on server actions)
+                currentUser = savedUser;
+                enterApp(); 
+            }
         }
 
-        function switchView(view) {
-            document.getElementById('login-view').classList.toggle('hidden');
-            document.getElementById('signup-view').classList.toggle('hidden');
-            document.getElementById('error-banner').style.display = 'none';
+        function toggleAuth() { 
+            document.getElementById('l-form').classList.toggle('hidden');
+            document.getElementById('s-form').classList.toggle('hidden');
         }
 
-        async function handleLogin() {
+        async function login() {
             const u = document.getElementById('l-user').value;
             const p = document.getElementById('l-pass').value;
             try {
-                const res = await fetch('/api/login', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({username: u, password: p})
-                });
+                const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: u, password: p}) });
                 const data = await res.json();
                 if(data.success) {
                     currentUser = data.username;
-                    localStorage.setItem('nexus_user', currentUser);
-                    enterApp(data);
-                } else showError(data.error);
-            } catch(e) { showError("Database Connection Failed. Check Render Settings."); }
+                    localStorage.setItem('nexus_user', currentUser); // SAVE SESSION
+                    enterApp();
+                } else document.getElementById('error-msg').innerText = data.error;
+            } catch(e) { document.getElementById('error-msg').innerText = "Connection Failed"; }
         }
 
-        async function handleSignup() {
+        async function signup() {
             const u = document.getElementById('s-user').value;
             const p = document.getElementById('s-pass').value;
             try {
-                const res = await fetch('/api/signup', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({username: u, password: p})
-                });
+                const res = await fetch('/api/signup', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: u, password: p}) });
                 const data = await res.json();
-                if(data.success) { alert("Account Created! Please Login."); switchView('login'); }
-                else showError(data.error);
-            } catch(e) { showError("Database Connection Failed."); }
+                if(data.success) { alert("Created! Login now."); toggleAuth(); }
+                else document.getElementById('error-msg').innerText = data.error;
+            } catch(e) { document.getElementById('error-msg').innerText = "Connection Failed"; }
         }
 
-        function enterApp(data) {
-            document.getElementById('auth-overlay').style.display = 'none';
-            document.getElementById('app-layout').style.display = 'flex';
-            document.getElementById('display-name').innerText = currentUser;
-            document.getElementById('display-points').innerText = data.points;
-            loadData();
+        function logout() {
+            localStorage.removeItem('nexus_user');
+            location.reload();
         }
 
+        function enterApp() {
+            document.getElementById('auth-overlay').classList.add('hidden');
+            document.getElementById('app').style.display = 'flex';
+            document.getElementById('d-user').innerText = currentUser;
+            loadFeed();
+        }
+
+        // --- SCRIPT MODAL ---
+        function showScriptModal() {
+            const code = `// ==UserScript==\n// @name Nexus Helper\n// @match https://www.youtube.com/*\n// ==/UserScript==\n(function(){\n 'use strict';\n const BACKEND="${RENDER_URL}";\n let user=prompt("Enter Nexus Username:");\n if(!user) return;\n document.addEventListener('click',e=>{\n  if(e.target.innerText.includes("Subscribe")){\n   setTimeout(()=>{\n    fetch(BACKEND+"/verify_action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user,type:"SUB"})});\n   },2000);\n  }\n });\n})();`;
+            document.getElementById('script-code').value = code;
+            document.getElementById('script-modal').classList.remove('hidden');
+        }
+
+        function copyScript() {
+            const copyText = document.getElementById("script-code");
+            copyText.select();
+            document.execCommand("copy");
+            alert("Copied! Paste into Tampermonkey.");
+        }
+
+        // --- APP LOGIC ---
         async function promote() {
             const url = document.getElementById('promo-url').value;
-            const res = await fetch('/api/promote', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username: currentUser, url: url, type: 'channel'})
-            });
+            const res = await fetch('/api/promote', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: currentUser, url: url, type: 'channel'}) });
             const data = await res.json();
-            if(data.success) alert("Promoted Successfully!"); else alert(data.error);
+            if(data.success) alert("Promoted!"); else alert(data.error);
         }
 
-        async function loadData() {
-            const res = await fetch('/api/data', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username: currentUser})
-            });
+        async function loadFeed() {
+            const res = await fetch('/api/data', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: currentUser}) });
             const data = await res.json();
-            const feed = document.getElementById('feed-container');
+            document.getElementById('d-pts').innerText = data.points; // Update points
+            const feed = document.getElementById('feed');
             feed.innerHTML = "";
             data.links.forEach(l => {
-                feed.innerHTML += `
-                <div class="card">
-                    <div style="position:absolute; top:10px; right:10px; font-size:0.7rem; color:#a1a1aa;">CHANNEL</div>
-                    <h3>${l.owner}</h3>
-                    <a href="${l.url}" target="_blank"><button class="btn-primary" style="padding:8px 15px;">Visit & Sub</button></a>
-                </div>`;
+                feed.innerHTML += `<div class="card"><div><b>${l.owner}</b></div><a href="${l.url}" target="_blank"><button style="margin:0; padding:5px 15px; width:auto;">Visit</button></a></div>`;
             });
         }
 
         function sendChat() {
-            const input = document.getElementById('chat-input');
-            if(!input.value) return;
-            socket.emit('send_message', {username: currentUser, message: input.value});
-            input.value = '';
+            const msg = document.getElementById('chat-msg').value;
+            socket.emit('send_message', {username: currentUser, message: msg});
+            document.getElementById('chat-msg').value = '';
         }
-
         socket.on('receive_message', (d) => {
             const box = document.getElementById('chat-box');
-            box.innerHTML += `<div class="chat-msg"><span class="chat-user">${d.username}:</span>${d.message}</div>`;
+            box.innerHTML += `<div style="margin-bottom:5px;"><b>${d.username}:</b> ${d.message}</div>`;
             box.scrollTop = box.scrollHeight;
         });
-        
-        socket.on('new_promotion', () => loadData());
-        socket.on('update_stats', (d) => { if(d.username === currentUser) document.getElementById('display-points').innerText = parseInt(document.getElementById('display-points').innerText) + d.points; });
+        socket.on('new_promotion', () => loadFeed());
+        socket.on('update_stats', (d) => { if(d.username === currentUser) document.getElementById('d-pts').innerText = parseInt(document.getElementById('d-pts').innerText) + d.points; });
     </script>
 </body>
 </html>
