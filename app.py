@@ -7,16 +7,16 @@ import threading
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from flask import Flask
+import traceback
 
 # ======================================================
-# 🛑 CONFIGURATION - RE-PASTE YOUR KEYS HERE!
+# 🛑 CONFIGURATION - PASTE CLIENT ID & SECRET HERE
 # ======================================================
+# You must paste these from your client_secret.json file!
+GOOGLE_CLIENT_ID = "PASTE_YOUR_LONG_CLIENT_ID_HERE"
+GOOGLE_CLIENT_SECRET = "PASTE_YOUR_CLIENT_SECRET_HERE"
 
-# 1. From Google Cloud Console
-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_ID") # Or paste directly if you prefer
-GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_SECRET") # Or paste directly if you prefer
-
-# 2. Your 5 Refresh Tokens
+# I have inserted your 5 tokens here:
 BOT_ACCOUNTS = [
     "1//049mP8dfOm1AECgYIARAAGAQSNQF-L9Irs_9dHdanUldtALZI-2mFcsLPfykh3qSfKZ8S5nqjjPUnjMRjt25j4WtMP4vxo4s2",
     "1//04iRGoOClh7V-CgYIARAAGAQSNwF-L9IrRFYJmhvg_Xfl7STK_rC9qUiopeZP62Owfh_XhcY109kn5gVX5c3WVRzzwkHo6REvWzs",
@@ -26,7 +26,7 @@ BOT_ACCOUNTS = [
 ]
 
 # ======================================================
-# 🔌 DATABASE & BOT SETUP
+# 🔌 DATABASE & BOT
 # ======================================================
 MONGO_URL = os.environ.get("MONGO_URL")
 client = pymongo.MongoClient(MONGO_URL)
@@ -38,26 +38,23 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ======================================================
-# 🌐 THE FAKE WEBSITE (KEEPS RENDER HAPPY)
-# ======================================================
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Bot is running!"
-
-def run_web():
-    # Runs a tiny web server on port 10000
-    app.run(host='0.0.0.0', port=10000)
-
-# ======================================================
-# 🤖 THE YOUTUBE LOGIC
+# 🤖 THE YOUTUBE LOGIC (DEBUG MODE)
 # ======================================================
 def run_boost(channel_id):
-    print(f"🚀 Boosting Channel: {channel_id}")
-    count = 0
-    for token in BOT_ACCOUNTS:
+    print(f"\n[DEBUG] 🚀 STARTING BOOST FOR: {channel_id}")
+    
+    # Safety Check
+    if "PASTE" in GOOGLE_CLIENT_ID:
+        print("[CRITICAL ERROR] You forgot to paste the Client ID in the code!")
+        return
+
+    success = 0
+    fail = 0
+
+    for i, token in enumerate(BOT_ACCOUNTS):
         try:
+            print(f"[DEBUG] 🔄 Attempting Account {i+1}...")
+            
             creds = Credentials(
                 None,
                 refresh_token=token,
@@ -65,99 +62,89 @@ def run_boost(channel_id):
                 client_id=GOOGLE_CLIENT_ID,
                 client_secret=GOOGLE_CLIENT_SECRET
             )
+            
             youtube = build('youtube', 'v3', credentials=creds)
+            
+            # The API Call
             youtube.subscriptions().insert(
                 part="snippet",
-                body={"snippet": {"resourceId": {"kind": "youtube#channel", "channelId": channel_id}}}
+                body={
+                    "snippet": {
+                        "resourceId": {
+                            "kind": "youtube#channel",
+                            "channelId": channel_id
+                        }
+                    }
+                }
             ).execute()
-            count += 1
-            print(f"✅ Account {count} Subbed.")
+            
+            print(f"[SUCCESS] ✅ Account {i+1} Subscribed!")
+            success += 1
+            
         except Exception as e:
-            print(f"⚠️ Account Failed: {e}")
+            error_msg = str(e)
+            if "subscriptionDuplicate" in error_msg:
+                print(f"[INFO] ⚠️ Account {i+1} is ALREADY subscribed.")
+                # We count this as a success because the user got the sub previously
+                success += 1 
+            elif "quotaExceeded" in error_msg:
+                print(f"[CRITICAL] ❌ Daily Quota Reached.")
+            elif "channelNotFound" in error_msg:
+                print(f"[CRITICAL] ❌ Channel ID is wrong.")
+            elif "invalid_grant" in error_msg:
+                 print(f"[CRITICAL] ❌ Token Expired. Needs new keys.")
+            else:
+                print(f"[ERROR] ❌ Account {i+1} Failed. Reason: {error_msg}")
+            fail += 1
+
+    print(f"[DEBUG] 🏁 FINISHED. Total Subs/Checks: {success}\n")
+
+# ======================================================
+# 🌐 FAKE WEBSITE
+# ======================================================
+app = Flask(__name__)
+@app.route('/')
+def home(): return "Online"
+def run_web(): app.run(host='0.0.0.0', port=10000, use_reloader=False)
 
 # ======================================================
 # 🎮 DISCORD COMMANDS
 # ======================================================
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user}')
-    try:
-        await bot.tree.sync()
-        print("✅ Commands Synced")
-    except Exception as e:
-        print(e)
+    print(f'✅ LOGGED IN AS: {bot.user}')
+    await bot.tree.sync()
 
-@bot.tree.command(name="register", description="Start your journey")
-async def register(interaction: discord.Interaction):
-    user_id = str(interaction.user.id)
-    if users_col.find_one({"discord_id": user_id}):
-        await interaction.response.send_message("Already registered!", ephemeral=True)
-    else:
-        users_col.insert_one({"discord_id": user_id, "points": 100})
-        await interaction.response.send_message("✅ Registered! You have 100 Points.", ephemeral=True)
-
-@bot.tree.command(name="points", description="Check balance")
-async def points(interaction: discord.Interaction):
-    user_id = str(interaction.user.id)
-    user = users_col.find_one({"discord_id": user_id})
-    if user: await interaction.response.send_message(f"💰 Points: {user['points']}")
-    else: await interaction.response.send_message("Type `/register` first!", ephemeral=True)
-
-@bot.tree.command(name="promote", description="Get 5 Bot Subs (50 Points)")
+@bot.tree.command(name="promote", description="Get 5 Bot Subs")
 async def promote(interaction: discord.Interaction, link: str):
     await interaction.response.defer()
-    user_id = str(interaction.user.id)
-    user = users_col.find_one({"discord_id": user_id})
-
-    if not user:
-        await interaction.followup.send("Type `/register` first!")
-        return
-    if user['points'] < 50:
-        await interaction.followup.send("❌ Need 50 Points!")
-        return
     
+    # 1. EXTRACT ID
     channel_id = ""
-    if "/channel/" in link:
-        channel_id = link.split("/channel/")[1].split("/")[0].split("?")[0]
-    else:
-        await interaction.followup.send("❌ Invalid Link! Must be `youtube.com/channel/ID`")
+    try:
+        if "/channel/" in link:
+            channel_id = link.split("/channel/")[1].split("/")[0].split("?")[0]
+        else:
+            await interaction.followup.send("❌ Link MUST contain `/channel/`")
+            return
+    except:
+        await interaction.followup.send("❌ Link format error.")
         return
 
-    users_col.update_one({"discord_id": user_id}, {"$inc": {"points": -50}})
-    threading.Thread(target=run_boost, args=(channel_id,)).start()
-    
-    embed = discord.Embed(title="🚀 Boost Started!", description=f"Sending 5 Subs to:\n{link}", color=0x00ff00)
-    await interaction.followup.send(embed=embed)
-
-# ======================================================
-# ⚡ INSTANT CHEAT CODE (NO SLASH COMMAND LAG)
-# ======================================================
-@bot.command()
-async def cheat(ctx):
-    # This runs when you type !cheat (not /cheat)
-    
-    # 1. Check if you are Admin
-    if not ctx.author.guild_permissions.administrator:
-        await ctx.send("❌ You are not an Admin!")
-        return
-        
-    user_id = str(ctx.author.id)
-    
-    # 2. Give 1 Million Points
-    if not users_col.find_one({"discord_id": user_id}):
-         users_col.insert_one({"discord_id": user_id, "points": 1000000})
-    else:
-         users_col.update_one({"discord_id": user_id}, {"$set": {"points": 1000000}})
-    
-    await ctx.send(f"✅ **BOOM!** {ctx.author.mention}, you now have **1,000,000 Points**! 🤑")
-
-# ======================================================
-# 🚀 START BOTH (WEB + BOT)
-# ======================================================
-if __name__ == "__main__":
-    # Start the fake website in the background
-    t = threading.Thread(target=run_web)
+    # 2. RUN DEBUGGER
+    print(f"[DEBUG] User {interaction.user} requested boost for {link}")
+    t = threading.Thread(target=run_boost, args=(channel_id,))
     t.start()
     
-    # Start the Discord Bot
+    await interaction.followup.send(f"🚀 **Attempting Boost!**\nTarget ID: `{channel_id}`\n\n**CHECK RENDER LOGS TO SEE RESULTS**")
+
+# INSTANT CHEAT
+@bot.command()
+async def cheat(ctx):
+    if ctx.author.guild_permissions.administrator:
+        users_col.update_one({"discord_id": str(ctx.author.id)}, {"$set": {"points": 1000000}}, upsert=True)
+        await ctx.send("✅ Points added.")
+
+if __name__ == "__main__":
+    threading.Thread(target=run_web).start()
     bot.run(os.environ.get("DISCORD_TOKEN"))
