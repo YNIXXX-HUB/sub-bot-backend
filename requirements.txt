@@ -5,3 +5,4 @@ dnspython
 flask_socketio
 eventlet
 simple-websocket
+gunicorn
