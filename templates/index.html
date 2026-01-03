@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Growth | Free YouTube Subs</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f0f13;
+            --panel: #18181b;
+            --accent: #6366f1; /* Indigo */
+            --accent-hover: #4f46e5;
+            --text: #ffffff;
+            --text-dim: #a1a1aa;
+            --red: #ef4444;
+            --green: #22c55e;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        /* AUTH SCREEN */
+        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 100; display: flex; align-items: center; justify-content: center; }
+        .auth-box { background: var(--panel); padding: 40px; border-radius: 12px; width: 350px; text-align: center; border: 1px solid #27272a; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+        .auth-box h1 { margin-bottom: 20px; color: var(--accent); }
+        input { width: 100%; background: #27272a; border: 1px solid #3f3f46; padding: 12px; color: white; border-radius: 6px; margin-bottom: 10px; outline: none; }
+        input:focus { border-color: var(--accent); }
+        button { width: 100%; background: var(--accent); color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { background: var(--accent-hover); }
+        .switch-btn { background: transparent; color: var(--text-dim); margin-top: 10px; font-size: 0.9rem; }
+        .switch-btn:hover { color: white; background: transparent; text-decoration: underline; }
+
+        /* MAIN DASHBOARD */
+        #dashboard { display: none; height: 100vh; display: flex; }
+        
+        /* SIDEBAR (Left) */
+        .sidebar { width: 250px; background: var(--panel); padding: 20px; border-right: 1px solid #27272a; display: flex; flex-direction: column; }
+        .logo { font-size: 1.5rem; font-weight: 800; color: var(--accent); margin-bottom: 30px; letter-spacing: -1px; }
+        .user-card { background: #27272a; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; }
+        .stat-val { font-weight: bold; color: var(--accent); }
+        .nav-btn { background: transparent; text-align: left; color: var(--text-dim); margin-bottom: 5px; }
+        .nav-btn:hover { background: #27272a; color: white; }
+        
+        /* FEED (Center) */
+        .main-feed { flex: 1; padding: 20px; overflow-y: auto; position: relative; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .promo-box { background: var(--panel); padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #27272a; }
+        .promo-inputs { display: flex; gap: 10px; margin-top: 10px; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
+        .card { background: var(--panel); border: 1px solid #27272a; border-radius: 8px; padding: 15px; transition: 0.2s; position: relative; }
+        .card:hover { transform: translateY(-2px); border-color: var(--accent); }
+        .card-tag { position: absolute; top: 10px; right: 10px; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: #27272a; text-transform: uppercase; }
+        .card h4 { margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card a { text-decoration: none; }
+        .card button { margin-top: 10px; background: #27272a; border: 1px solid var(--accent); color: var(--accent); }
+        .card button:hover { background: var(--accent); color: white; }
+
+        /* CHAT (Right) */
+        .chat-panel { width: 300px; background: var(--panel); border-left: 1px solid #27272a; display: flex; flex-direction: column; }
+        .chat-header { padding: 15px; border-bottom: 1px solid #27272a; font-weight: bold; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { font-size: 0.9rem; line-height: 1.4; }
+        .msg strong { color: var(--accent); margin-right: 5px; }
+        .chat-input-area { padding: 15px; border-top: 1px solid #27272a; }
+
+        /* SCRIPT WARNING */
+        .warning-banner { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--red); color: var(--red); padding: 10px; border-radius: 6px; margin-bottom: 20px; font-size: 0.9rem; text-align: center; }
+
+        /* UTILS */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen">
+        <div class="auth-box">
+            <h1>Nexus Growth</h1>
+            <div id="login-form">
+                <input type="text" id="l-user" placeholder="Username">
+                <input type="password" id="l-pass" placeholder="Password">
+                <button onclick="login()">Log In</button>
+                <button class="switch-btn" onclick="toggleAuth()">Need an account? Sign Up</button>
+            </div>
+            <div id="signup-form" class="hidden">
+                <input type="text" id="s-user" placeholder="Pick a Username">
+                <input type="password" id="s-pass" placeholder="Password">
+                <button onclick="signup()">Create Account</button>
+                <button class="switch-btn" onclick="toggleAuth()">Have an account? Log In</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="hidden">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">Nexus 🚀</div>
+            <div class="user-card">
+                <div style="margin-bottom: 10px; font-weight: bold;" id="display-user">User</div>
+                <div class="stat-row"><span>Points</span><span class="stat-val" id="points-val">0</span></div>
+                <div class="stat-row"><span>Level</span><span class="stat-val" id="level-val">1</span></div>
+            </div>
+            <button class="nav-btn" onclick="alert('Script Link: Copy from Tampermonkey instructions!')">📜 Get Script</button>
+            <button class="nav-btn" style="color:var(--red);" onclick="logout()">Log Out</button>
+        </div>
+
+        <!-- Main Feed -->
+        <div class="main-feed">
+            <div class="warning-banner">
+                ⚠️ You must have the Tampermonkey Script installed to earn points!
+            </div>
+
+            <div class="promo-box">
+                <h3>Promote Your Content</h3>
+                <div class="promo-inputs">
+                    <input type="text" id="promo-url" placeholder="https://youtube.com/...">
+                    <select id="promo-type" style="background:#27272a; color:white; border:1px solid #3f3f46; border-radius:6px; padding:0 10px;">
+                        <option value="channel">Channel (50 Pts)</option>
+                        <option value="video">Video (30 Pts)</option>
+                    </select>
+                    <button style="width: 100px;" onclick="promote()">Post</button>
+                </div>
+            </div>
+
+            <div class="header">
+                <h3>Active Promotions</h3>
+                <button style="width: auto; padding: 5px 15px;" onclick="loadData()">Refresh</button>
+            </div>
+            <div class="card-grid" id="feed">
+                <!-- Cards go here -->
+            </div>
+        </div>
+
+        <!-- Live Chat -->
+        <div class="chat-panel">
+            <div class="chat-header">Live Chat 🟢</div>
+            <div class="chat-messages" id="chat-box">
+                <div class="msg" style="color:var(--text-dim)">Welcome to the chat!</div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-msg" placeholder="Type a message..." onkeypress="handleEnter(event)">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentUser = null;
+
+        // --- AUTH ---
+        function toggleAuth() {
+            document.getElementById('login-form').classList.toggle('hidden');
+            document.getElementById('signup-form').classList.toggle('hidden');
+        }
+
+        async function login() {
+            const u = document.getElementById('l-user').value;
+            const p = document.getElementById('l-pass').value;
+            const res = await fetch('/api/login', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: u, password: p})
+            });
+            const data = await res.json();
+            if(data.success) {
+                currentUser = data.username;
+                localStorage.setItem('nexus_user', currentUser); // For Script
+                showDash();
+                loadData();
+            } else alert(data.error);
+        }
+
+        async function signup() {
+            const u = document.getElementById('s-user').value;
+            const p = document.getElementById('s-pass').value;
+            const res = await fetch('/api/signup', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: u, password: p})
+            });
+            const data = await res.json();
+            if(data.success) { alert("Account created! Please log in."); toggleAuth(); }
+            else alert(data.error);
+        }
+
+        function logout() {
+            location.reload();
+        }
+
+        function showDash() {
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            document.getElementById('display-user').innerText = currentUser;
+        }
+
+        // --- DATA ---
+        async function loadData() {
+            const res = await fetch('/api/data', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: currentUser})
+            });
+            const data = await res.json();
+            document.getElementById('points-val').innerText = data.points;
+            document.getElementById('level-val').innerText = Math.floor(data.xp / 100) + 1;
+            
+            const feed = document.getElementById('feed');
+            feed.innerHTML = '';
+            data.links.forEach(link => addCard(link));
+        }
+
+        function addCard(link) {
+            const feed = document.getElementById('feed');
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.innerHTML = `
+                <div class="card-tag">${link.type}</div>
+                <h4>${link.owner}</h4>
+                <div style="font-size:0.8rem; color:#a1a1aa; margin-bottom:10px;">${new Date(link.timestamp).toLocaleTimeString()}</div>
+                <a href="${link.url}" target="_blank">
+                    <button>Visit & ${link.type === 'channel' ? 'Sub' : 'Watch'}</button>
+                </a>
+            `;
+            feed.prepend(div);
+        }
+
+        async function promote() {
+            const url = document.getElementById('promo-url').value;
+            const type = document.getElementById('promo-type').value;
+            const res = await fetch('/api/promote', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: currentUser, url: url, type: type})
+            });
+            const data = await res.json();
+            if(data.success) { alert("Promoted!"); loadData(); }
+            else alert(data.error);
+        }
+
+        // --- SOCKETS (REAL TIME) ---
+        function handleEnter(e) { if(e.key === 'Enter') sendChat(); }
+        
+        function sendChat() {
+            const input = document.getElementById('chat-msg');
+            if(!input.value) return;
+            socket.emit('send_message', {username: currentUser, message: input.value});
+            input.value = '';
+        }
+
+        socket.on('receive_message', (data) => {
+            const chat = document.getElementById('chat-box');
+            chat.innerHTML += `<div class="msg"><strong>${data.username}:</strong>${data.message}</div>`;
+            chat.scrollTop = chat.scrollHeight;
+        });
+
+        socket.on('new_promotion', (link) => {
+            addCard(link);
+        });
+
+        socket.on('update_stats', (data) => {
+            // Live update points if it's me
+            if(data.username === currentUser) {
+                const ptSpan = document.getElementById('points-val');
+                ptSpan.innerText = parseInt(ptSpan.innerText) + data.points;
+            }
+        });
+    </script>
+</body>
+</html>
