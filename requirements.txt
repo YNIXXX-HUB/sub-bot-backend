@@ -1,8 +1,6 @@
-flask
-flask_cors
+discord.py
 pymongo
 dnspython
-flask_socketio
-eventlet
-simple-websocket
-gunicorn
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
