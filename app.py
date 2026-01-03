@@ -6,11 +6,10 @@ import os
 import threading
 import time
 import random
-import sys # Needed to force logs to show up
+import sys
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from flask import Flask
-import httplib2
 
 # ======================================================
 # 🛑 CONFIGURATION
@@ -26,14 +25,6 @@ BOT_ACCOUNTS = [
     "1//04uvBHWSPOKzbCgYIARAAGAQSNwF-L9IrnaD9umWz6wX_8cCdLiPVe3rWSX4XphyuzgpnEgSJY--vxFjUIE5kAkMsSR88tbJ35a0"
 ]
 
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (Linux; Android 10; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Mobile Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36"
-]
-
 MONGO_URL = os.environ.get("MONGO_URL")
 client = pymongo.MongoClient(MONGO_URL)
 db = client.get_database("sub_bot_db")
@@ -44,27 +35,31 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ======================================================
-# 🤖 YOUTUBE LOGIC (EXTREME DEBUG MODE)
+# 🤖 YOUTUBE LOGIC (Clean & Robust)
 # ======================================================
 def run_boost(channel_id):
-    # Force logs to print immediately
     print(f"\n[DEBUG] 🚀 STARTING JOB FOR: {channel_id}", flush=True)
     
-    # 1. CHECK KEYS
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        print("[CRITICAL ERROR] ❌ GOOGLE_ID or GOOGLE_SECRET is missing from Render Environment!", flush=True)
+        print("[CRITICAL ERROR] ❌ GOOGLE_ID or GOOGLE_SECRET is missing!", flush=True)
         return
 
+    # Shuffle to keep it random
     indices = list(range(len(BOT_ACCOUNTS)))
     random.shuffle(indices)
 
     for i in indices:
         token = BOT_ACCOUNTS[i]
-        fake_agent = USER_AGENTS[i % len(USER_AGENTS)]
         
         print(f"[DEBUG] 🔄 Preparing Account {i+1}...", flush=True)
         
         try:
+            # 1. RANDOM SLEEP (The protection)
+            # This separates the subs so they don't look like a bot swarm
+            wait_time = random.randint(30, 60)
+            print(f"⏳ Waiting {wait_time}s to avoid detection...", flush=True)
+            time.sleep(wait_time)
+
             # 2. LOGIN
             creds = Credentials(
                 None,
@@ -74,13 +69,10 @@ def run_boost(channel_id):
                 client_secret=GOOGLE_CLIENT_SECRET
             )
             
-            # 3. SPOOF HEADER
-            http = httplib2.Http()
-            http = creds.authorize(http)
-            http.headers = {'User-Agent': fake_agent}
+            # 3. BUILD SERVICE (Standard Method - No spoofing hacks that break)
+            youtube = build('youtube', 'v3', credentials=creds)
 
             # 4. SUBSCRIBE
-            youtube = build('youtube', 'v3', http=http)
             youtube.subscriptions().insert(
                 part="snippet",
                 body={"snippet": {"resourceId": {"kind": "youtube#channel", "channelId": channel_id}}}
@@ -88,20 +80,14 @@ def run_boost(channel_id):
             
             print(f"[SUCCESS] ✅ Account {i+1} Subscribed!", flush=True)
             
-            # 5. WAIT (30s)
-            print(f"⏳ Waiting 30 seconds to avoid spam filter...", flush=True)
-            time.sleep(30)
-            
         except Exception as e:
             error_str = str(e)
             if "subscriptionDuplicate" in error_str:
                 print(f"[INFO] ⚠️ Account {i+1} was ALREADY subscribed.", flush=True)
             elif "invalid_grant" in error_str:
-                print(f"[FATAL] ❌ TOKEN EXPIRED. Your tokens are older than 7 days. You must generate new ones.", flush=True)
-            elif "quotaExceeded" in error_str:
-                print(f"[FATAL] ❌ Daily Limit Reached (200 subs).", flush=True)
+                print(f"[FATAL] ❌ TOKEN EXPIRED. Generate new keys on PC.", flush=True)
             else:
-                print(f"[ERROR] ❌ Account {i+1} Failed. Google said: {error_str}", flush=True)
+                print(f"[ERROR] ❌ Account {i+1} Failed: {error_str}", flush=True)
 
     print("[DEBUG] 🏁 JOB FINISHED.", flush=True)
 
@@ -125,9 +111,8 @@ async def on_ready():
 async def promote(interaction: discord.Interaction, link: str):
     await interaction.response.defer()
     
-    print(f"[CMD] User {interaction.user} requested promote: {link}", flush=True)
+    print(f"[CMD] Promote requested: {link}", flush=True)
     
-    # LINK CHECK
     channel_id = ""
     try:
         if "/channel/" in link:
@@ -139,17 +124,15 @@ async def promote(interaction: discord.Interaction, link: str):
         await interaction.followup.send("❌ Invalid Link")
         return
 
-    # DATABASE CHECK
     user_id = str(interaction.user.id)
     user = users_col.find_one({"discord_id": user_id})
 
     if not user or user['points'] < 50:
-        await interaction.followup.send("❌ Need 50 Points! Use `!cheat` if you are admin.")
+        await interaction.followup.send("❌ Need 50 Points! Use `!cheat` if admin.")
         return
 
     users_col.update_one({"discord_id": user_id}, {"$inc": {"points": -50}})
     
-    # START THREAD
     threading.Thread(target=run_boost, args=(channel_id,)).start()
     
     embed = discord.Embed(title="🚀 Boost Queued!", description=f"Sending 5 Subscribers to:\n{link}", color=0x00ff00)
