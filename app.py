@@ -4,19 +4,19 @@ from discord import app_commands
 import pymongo
 import os
 import threading
+import time
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from flask import Flask
-import traceback
 
 # ======================================================
-# 🛑 CONFIGURATION - PASTE CLIENT ID & SECRET HERE
+# 🛑 CONFIGURATION
 # ======================================================
-# You must paste these from your client_secret.json file!
-GOOGLE_CLIENT_ID = "PASTE_YOUR_LONG_CLIENT_ID_HERE"
-GOOGLE_CLIENT_SECRET = "PASTE_YOUR_CLIENT_SECRET_HERE"
+# PULLS FROM RENDER ENVIRONMENT (No need to paste here)
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_ID")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_SECRET")
 
-# I have inserted your 5 tokens here:
+# Your 5 Tokens
 BOT_ACCOUNTS = [
     "1//049mP8dfOm1AECgYIARAAGAQSNQF-L9Irs_9dHdanUldtALZI-2mFcsLPfykh3qSfKZ8S5nqjjPUnjMRjt25j4WtMP4vxo4s2",
     "1//04iRGoOClh7V-CgYIARAAGAQSNwF-L9IrRFYJmhvg_Xfl7STK_rC9qUiopeZP62Owfh_XhcY109kn5gVX5c3WVRzzwkHo6REvWzs",
@@ -38,23 +38,19 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ======================================================
-# 🤖 THE YOUTUBE LOGIC (DEBUG MODE)
+# 🤖 YOUTUBE LOGIC (WITH 5 SECOND DELAY)
 # ======================================================
 def run_boost(channel_id):
-    print(f"\n[DEBUG] 🚀 STARTING BOOST FOR: {channel_id}")
-    
-    # Safety Check
-    if "PASTE" in GOOGLE_CLIENT_ID:
-        print("[CRITICAL ERROR] You forgot to paste the Client ID in the code!")
-        return
-
+    print(f"🚀 STARTING BOOST FOR: {channel_id}")
     success = 0
-    fail = 0
+    
+    # Check if Render Variables are working
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        print("❌ CRITICAL ERROR: Google Keys missing from Render Environment!")
+        return
 
     for i, token in enumerate(BOT_ACCOUNTS):
         try:
-            print(f"[DEBUG] 🔄 Attempting Account {i+1}...")
-            
             creds = Credentials(
                 None,
                 refresh_token=token,
@@ -62,49 +58,32 @@ def run_boost(channel_id):
                 client_id=GOOGLE_CLIENT_ID,
                 client_secret=GOOGLE_CLIENT_SECRET
             )
-            
             youtube = build('youtube', 'v3', credentials=creds)
             
-            # The API Call
             youtube.subscriptions().insert(
                 part="snippet",
-                body={
-                    "snippet": {
-                        "resourceId": {
-                            "kind": "youtube#channel",
-                            "channelId": channel_id
-                        }
-                    }
-                }
+                body={"snippet": {"resourceId": {"kind": "youtube#channel", "channelId": channel_id}}}
             ).execute()
             
-            print(f"[SUCCESS] ✅ Account {i+1} Subscribed!")
+            print(f"✅ Account {i+1} Subbed.")
             success += 1
             
+            # 5 SECOND DELAY (Fixes the +1 count issue)
+            time.sleep(5) 
+            
         except Exception as e:
-            error_msg = str(e)
-            if "subscriptionDuplicate" in error_msg:
-                print(f"[INFO] ⚠️ Account {i+1} is ALREADY subscribed.")
-                # We count this as a success because the user got the sub previously
+            if "subscriptionDuplicate" in str(e):
+                print(f"⚠️ Account {i+1} already subbed.")
                 success += 1 
-            elif "quotaExceeded" in error_msg:
-                print(f"[CRITICAL] ❌ Daily Quota Reached.")
-            elif "channelNotFound" in error_msg:
-                print(f"[CRITICAL] ❌ Channel ID is wrong.")
-            elif "invalid_grant" in error_msg:
-                 print(f"[CRITICAL] ❌ Token Expired. Needs new keys.")
             else:
-                print(f"[ERROR] ❌ Account {i+1} Failed. Reason: {error_msg}")
-            fail += 1
-
-    print(f"[DEBUG] 🏁 FINISHED. Total Subs/Checks: {success}\n")
+                print(f"❌ Account {i+1} Failed: {e}")
 
 # ======================================================
-# 🌐 FAKE WEBSITE
+# 🌐 FAKE WEBSITE (KEEPS BOT ONLINE)
 # ======================================================
 app = Flask(__name__)
 @app.route('/')
-def home(): return "Online"
+def home(): return "Bot Online"
 def run_web(): app.run(host='0.0.0.0', port=10000, use_reloader=False)
 
 # ======================================================
@@ -115,35 +94,70 @@ async def on_ready():
     print(f'✅ LOGGED IN AS: {bot.user}')
     await bot.tree.sync()
 
-@bot.tree.command(name="promote", description="Get 5 Bot Subs")
+@bot.tree.command(name="help", description="Show commands")
+async def help(interaction: discord.Interaction):
+    embed = discord.Embed(title="🤖 Commands", color=0x00ff00)
+    embed.add_field(name="`/register`", value="Get 100 points", inline=False)
+    embed.add_field(name="`/promote [link]`", value="Get 5 Subs (50 Points)", inline=False)
+    embed.add_field(name="`!cheat`", value="Admin: Get 1M Points", inline=False)
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="register", description="Create account")
+async def register(interaction: discord.Interaction):
+    user_id = str(interaction.user.id)
+    if users_col.find_one({"discord_id": user_id}):
+        await interaction.response.send_message("Already registered!", ephemeral=True)
+    else:
+        users_col.insert_one({"discord_id": user_id, "points": 100})
+        await interaction.response.send_message("✅ Account Created! You have 100 Points.", ephemeral=True)
+
+@bot.tree.command(name="points", description="Check balance")
+async def points(interaction: discord.Interaction):
+    user_id = str(interaction.user.id)
+    user = users_col.find_one({"discord_id": user_id})
+    if user: await interaction.response.send_message(f"💰 You have **{user['points']}** Points.")
+    else: await interaction.response.send_message("Type `/register` first!", ephemeral=True)
+
+@bot.tree.command(name="promote", description="Get 5 Subs (50 Points)")
 async def promote(interaction: discord.Interaction, link: str):
     await interaction.response.defer()
     
-    # 1. EXTRACT ID
+    # Check Link
     channel_id = ""
     try:
         if "/channel/" in link:
             channel_id = link.split("/channel/")[1].split("/")[0].split("?")[0]
         else:
-            await interaction.followup.send("❌ Link MUST contain `/channel/`")
+            await interaction.followup.send("❌ Link MUST look like: `youtube.com/channel/UC...`")
             return
     except:
-        await interaction.followup.send("❌ Link format error.")
+        await interaction.followup.send("❌ Invalid Link")
         return
 
-    # 2. RUN DEBUGGER
-    print(f"[DEBUG] User {interaction.user} requested boost for {link}")
-    t = threading.Thread(target=run_boost, args=(channel_id,))
-    t.start()
-    
-    await interaction.followup.send(f"🚀 **Attempting Boost!**\nTarget ID: `{channel_id}`\n\n**CHECK RENDER LOGS TO SEE RESULTS**")
+    # Check User
+    user_id = str(interaction.user.id)
+    user = users_col.find_one({"discord_id": user_id})
+    if not user:
+        await interaction.followup.send("Type `/register` first!")
+        return
+    if user['points'] < 50:
+        await interaction.followup.send("❌ Need 50 Points!")
+        return
 
-# INSTANT CHEAT
+    # Execute
+    users_col.update_one({"discord_id": user_id}, {"$inc": {"points": -50}})
+    threading.Thread(target=run_boost, args=(channel_id,)).start()
+    
+    embed = discord.Embed(title="🚀 Boost Started!", description=f"Sending 5 Subscribers to:\n{link}", color=0x00ff00)
+    embed.set_footer(text="Wait a few minutes for updates.")
+    await interaction.followup.send(embed=embed)
+
+# ADMIN CHEAT
 @bot.command()
 async def cheat(ctx):
     if ctx.author.guild_permissions.administrator:
         users_col.update_one({"discord_id": str(ctx.author.id)}, {"$set": {"points": 1000000}}, upsert=True)
-        await ctx.send("✅ Points added.")
+        await ctx.send("✅ **CHEAT ACTIVATED:** You are now a Millionaire.")
 
 if __name__ == "__main__":
     threading.Thread(target=run_web).start()
